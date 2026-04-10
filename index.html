@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBassy | Local Knowledge Hub</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpine-turnout"></script>
+    <script src="https://unpkg.com/alpinejs" defer></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
+        /* Keeps the delete button visible if it has focus or is being hovered */
+        .group:hover .group-hover\:opacity-100, .group:focus-within .group-hover\:opacity-100 { opacity: 1; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100" x-data="mbassy" x-cloak>
+
+    <div class="flex h-screen w-full overflow-hidden">
+        
+        <aside class="w-64 border-r border-slate-800 flex flex-col p-4 bg-slate-900 shadow-2xl">
+            <div class="flex items-center gap-3 mb-8 px-2">
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white">M</div>
+                <h1 class="text-xl font-black tracking-tighter text-indigo-400">MBASSY</h1>
+            </div>
+
+            <button @click="addNote()" class="mb-6 w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-black transition-all shadow-lg shadow-indigo-500/20 active:scale-95">
+                + NEW DOCUMENT
+            </button>
+            
+            <nav class="flex-1 space-y-1 overflow-y-auto custom-scrollbar">
+                <template x-for="note in notes" :key="note.id">
+                    <div class="group relative flex items-center">
+                        <a :href="'/note/' + note.id" 
+                           class="flex-1 px-4 py-2.5 rounded-lg text-sm transition-all duration-200 pr-10"
+                           :class="$store.turnout.path === '/note/' + note.id ? 'bg-slate-800 text-white shadow-inner border border-slate-700' : 'text-slate-500 hover:text-slate-300'"
+                           x-text="note.title || 'Untitled'"></a>
+                        
+                        <button @click.stop.prevent="deleteNote(note.id)" 
+                                class="absolute right-2 opacity-0 group-hover:opacity-100 p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+                </template>
+            </nav>
+            
+            <div class="mt-4 pt-4 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest text-center">
+                Storage: <span class="text-slate-400" x-text="notes.length"></span> Documents
+            </div>
+        </aside>
+
+        <main class="flex-1 bg-white text-slate-900 relative">
+            
+            <section x-route="/" class="h-full flex flex-col items-center justify-center text-slate-300">
+                <div class="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mb-6 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <p class="font-bold text-slate-400 text-xs tracking-widest uppercase">Select a file to begin</p>
+            </section>
+
+            <section x-route="/note/:id" class="h-full flex flex-col" 
+                     x-data="{ localContent: '' }" 
+                     x-effect="if(_active) { const n = notes.find(x => x.id == id); localContent = n ? n.content : ''; }">
+                
+                <header class="h-14 border-b border-slate-100 flex items-center px-6 justify-between bg-slate-50/50">
+                    <div class="flex items-center gap-4 flex-1">
+                        <span class="text-[10px] font-black text-slate-400 tracking-widest uppercase shrink-0">Archive // </span>
+                        <template x-if="notes.find(x => x.id == id)">
+                            <input type="text" 
+                                   :value="notes.find(x => x.id == id)?.title" 
+                                   @input="updateTitle(id, $event.target.value)"
+                                   class="bg-transparent font-bold text-sm focus:outline-none border-b border-transparent focus:border-indigo-500 transition-all w-full max-w-md">
+                        </template>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Active Link</span>
+                    </div>
+                </header>
+
+                <div class="flex-1 flex overflow-hidden">
+                    <textarea x-model="localContent" 
+                              @input="updateNote(id, localContent)"
+                              class="w-1/2 h-full p-8 outline-none font-mono text-sm leading-relaxed text-slate-700 bg-white resize-none" 
+                              placeholder="Begin decrypted transmission..."></textarea>
+                    
+                    <div class="w-1/2 h-full p-10 overflow-y-auto bg-slate-50/30 prose prose-slate prose-sm max-w-none border-l border-slate-100">
+                        <div x-html="marked.parse(localContent || '')"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section x-route="*" class="h-full flex flex-col items-center justify-center text-slate-400">
+                <h2 class="text-4xl font-black mb-2">404</h2>
+                <a href="/" class="text-indigo-600 font-bold hover:underline">Return to Hub</a>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('mbassy', () => ({
+                notes: JSON.parse(localStorage.getItem('mbassy_vault')) || [],
+
+                addNote() {
+                    const id = Date.now().toString(); // Store IDs as strings for easier route matching
+                    const newNote = { 
+                        id, 
+                        title: 'New Note ' + (this.notes.length + 1), 
+                        content: '' 
+                    };
+                    
+                    this.notes.unshift(newNote);
+                    this.save();
+                    
+                    // Force navigation to the new document
+                    setTimeout(() => Alpine.store('turnout').go('/note/' + id), 100);
+                },
+
+                updateNote(id, content) {
+                    const note = this.notes.find(n => n.id == id);
+                    if (note) {
+                        note.content = content;
+                        this.save();
+                    }
+                },
+
+                updateTitle(id, title) {
+                    const note = this.notes.find(n => n.id == id);
+                    if (note) {
+                        note.title = title;
+                        this.save();
+                    }
+                },
+
+                deleteNote(id) {
+                    if (confirm('Permanently delete this document?')) {
+                        const currentPath = Alpine.store('turnout').path;
+                        this.notes = this.notes.filter(n => n.id != id);
+                        this.save();
+                        
+                        if (currentPath === '/note/' + id) {
+                            Alpine.store('turnout').go('/');
+                        }
+                    }
+                },
+
+                save() {
+                    localStorage.setItem('mbassy_vault', JSON.stringify(this.notes));
+                }
+            }));
+        });
+    </script>
+</body>
+</html>
