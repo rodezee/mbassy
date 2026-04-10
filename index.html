@@ -89,7 +89,7 @@
                     <textarea x-model="localContent" 
                               @input="updateNote(id, localContent)"
                               class="w-1/2 h-full p-8 outline-none font-mono text-sm leading-relaxed text-slate-700 bg-white resize-none" 
-                              placeholder="Begin decrypted transmission..."></textarea>
+                              placeholder="Write MarkDown Here..."></textarea>
                     
                     <div class="w-1/2 h-full p-10 overflow-y-auto bg-slate-50/30 prose prose-slate prose-sm max-w-none border-l border-slate-100">
                         <div x-html="marked.parse(localContent || '')"></div>
