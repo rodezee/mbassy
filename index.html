@@ -14,19 +14,17 @@
         [x-cloak] { display: none !important; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-
-        /* Keeps the delete button visible if it has focus or is being hovered */
         .group:hover .group-hover\:opacity-100, .group:focus-within .group-hover\:opacity-100 { opacity: 1; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100" x-data="mbassy" x-cloak>
+<body class="bg-slate-900 text-slate-100" x-data="mbassy" x-init="checkIncomingShare()" x-cloak>
 
     <div class="flex h-screen w-full overflow-hidden">
         
-        <aside class="w-64 border-r border-slate-800 flex flex-col p-4 bg-slate-900 shadow-2xl">
+        <aside class="w-64 border-r border-slate-800 flex flex-col p-4 bg-slate-900 shadow-2xl shrink-0">
             <div class="flex items-center gap-3 mb-8 px-2">
-                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white">M</div>
-                <h1 class="text-xl font-black tracking-tighter text-indigo-400">MBASSY</h1>
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white cursor-pointer" @click="$store.turnout.go('/')">M</div>
+                <h1 class="text-xl font-black tracking-tighter text-indigo-400 cursor-pointer" @click="$store.turnout.go('/')">MBASSY</h1>
             </div>
 
             <button @click="addNote()" class="mb-6 w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-black transition-all shadow-lg shadow-indigo-500/20 active:scale-95">
@@ -37,7 +35,7 @@
                 <template x-for="note in notes" :key="note.id">
                     <div class="group relative flex items-center">
                         <a :href="'/note/' + note.id" 
-                           class="flex-1 px-4 py-2.5 rounded-lg text-sm transition-all duration-200 pr-10"
+                           class="flex-1 px-4 py-2.5 rounded-lg text-sm transition-all duration-200 pr-10 truncate"
                            :class="$store.turnout.path === '/note/' + note.id ? 'bg-slate-800 text-white shadow-inner border border-slate-700' : 'text-slate-500 hover:text-slate-300'"
                            x-text="note.title || 'Untitled'"></a>
                         
@@ -48,10 +46,6 @@
                     </div>
                 </template>
             </nav>
-            
-            <div class="mt-4 pt-4 border-t border-slate-800 text-[10px] text-slate-600 font-bold uppercase tracking-widest text-center">
-                Storage: <span class="text-slate-400" x-text="notes.length"></span> Documents
-            </div>
         </aside>
 
         <main class="flex-1 bg-white text-slate-900 relative">
@@ -77,9 +71,17 @@
                                    class="bg-transparent font-bold text-sm focus:outline-none border-b border-transparent focus:border-indigo-500 transition-all w-full max-w-md">
                         </template>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Active Link</span>
+                    
+                    <div class="flex items-center gap-4">
+                        <button @click="shareNote(id)" 
+                                class="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                            Share
+                        </button>
+                        <div class="flex items-center gap-2 px-2 border-l border-slate-200 ml-2">
+                            <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <span class="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Active</span>
+                        </div>
                     </div>
                 </header>
 
@@ -108,19 +110,16 @@
             Alpine.data('mbassy', () => ({
                 notes: JSON.parse(localStorage.getItem('mbassy_vault')) || [],
 
-                addNote() {
-                    const id = Date.now().toString(); // Store IDs as strings for easier route matching
+                addNote(title = '', content = '') {
+                    const id = Date.now().toString();
                     const newNote = { 
                         id, 
-                        title: 'New Note ' + (this.notes.length + 1), 
-                        content: '' 
+                        title: title || 'New Note ' + (this.notes.length + 1), 
+                        content: content || '' 
                     };
-                    
                     this.notes.unshift(newNote);
                     this.save();
-                    
-                    // Force navigation to the new document
-                    setTimeout(() => Alpine.store('turnout').go('/note/' + id), 100);
+                    setTimeout(() => Alpine.store('turnout').go('/note/' + id), 50);
                 },
 
                 updateNote(id, content) {
@@ -144,9 +143,39 @@
                         const currentPath = Alpine.store('turnout').path;
                         this.notes = this.notes.filter(n => n.id != id);
                         this.save();
-                        
-                        if (currentPath === '/note/' + id) {
-                            Alpine.store('turnout').go('/');
+                        if (currentPath === '/note/' + id) Alpine.store('turnout').go('/');
+                    }
+                },
+
+                shareNote(id) {
+                    const note = this.notes.find(n => n.id == id);
+                    if (!note) return;
+                    
+                    // Use a simple JSON + Base64 encode for the shareable payload
+                    const payload = btoa(unescape(encodeURIComponent(JSON.stringify({
+                        t: note.title,
+                        c: note.content
+                    }))));
+                    
+                    const url = `${window.location.origin}/#share=${payload}`;
+                    
+                    navigator.clipboard.writeText(url).then(() => {
+                        alert('Shareable link copied to clipboard! Anyone with this link can import this note.');
+                    });
+                },
+
+                checkIncomingShare() {
+                    const hash = window.location.hash;
+                    if (hash.startsWith('#share=')) {
+                        try {
+                            const payload = JSON.parse(decodeURIComponent(escape(atob(hash.split('=')[1]))));
+                            if (payload.t && confirm(`Import incoming note: "${payload.t}"?`)) {
+                                this.addNote(payload.t, payload.c);
+                                // Clear hash after import
+                                history.replaceState(null, null, window.location.pathname);
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse shared note', e);
                         }
                     }
                 },
